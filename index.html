@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Folder Text Viewer</title>
+<style>
+body { font-family: Arial, sans-serif; margin: 20px; background: #f9fafb; }
+h2 { color: #333; }
+select, input { padding: 6px; margin: 5px 0; width: 300px; }
+textarea { width: 95%; height: 500px; margin-top: 10px; padding: 10px; font-size: 14px; }
+button { padding: 6px 12px; margin: 5px; }
+</style>
+</head>
+<body>
+<h2>📂 Folder Text Viewer</h2>
+
+<label>Subfolder:</label>
+<select id="folderSelect">
+    <option value="">--Select Subfolder--</option>
+    {% for folder in subfolders %}
+    <option value="{{ folder }}">{{ folder }}</option>
+    {% endfor %}
+</select>
+
+<br>
+<label>Search topic:</label>
+<input type="text" id="searchInput" placeholder="Type to search..." />
+
+<br>
+<label>Topics:</label>
+<select id="topicSelect" size="5" style="width: 320px;"></select>
+
+<br>
+<button onclick="prevFile()">⬅ Previous</button>
+<button onclick="nextFile()">Next ➡</button>
+
+<textarea id="contentBox" readonly>Choose a topic to view.</textarea>
+
+<script>
+let topics = [];
+let currentIndex = 0;
+
+const folderSelect = document.getElementById("folderSelect");
+const topicSelect = document.getElementById("topicSelect");
+const contentBox = document.getElementById("contentBox");
+const searchInput = document.getElementById("searchInput");
+
+folderSelect.addEventListener("change", () => {
+    fetchTopics();
+});
+
+searchInput.addEventListener("input", () => {
+    filterTopics();
+});
+
+topicSelect.addEventListener("change", () => {
+    const idx = topicSelect.selectedIndex;
+    if(idx >= 0) {
+        currentIndex = idx;
+        showFile(currentIndex);
+    }
+});
+
+function fetchTopics() {
+    const folder = folderSelect.value;
+    fetch(`/topics?folder=${folder}`)
+        .then(res => res.json())
+        .then(data => {
+            topics = data;
+            currentIndex = 0;
+            populateTopicList();
+            if(topics.length > 0) showFile(currentIndex);
+            else contentBox.value = "No topics found.";
+        });
+}
+
+function populateTopicList() {
+    topicSelect.innerHTML = "";
+    topics.forEach(t => {
+        const opt = document.createElement("option");
+        opt.textContent = t.topic;
+        topicSelect.appendChild(opt);
+    });
+}
+
+function filterTopics() {
+    const q = searchInput.value.toLowerCase();
+    const filtered = topics.filter(t => t.topic.toLowerCase().includes(q));
+    topicSelect.innerHTML = "";
+    filtered.forEach(t => {
+        const opt = document.createElement("option");
+        opt.textContent = t.topic;
+        topicSelect.appendChild(opt);
+    });
+    currentIndex = 0;
+    if(filtered.length > 0) showFile(currentIndex);
+    else contentBox.value = "No match found.";
+}
+
+function showFile(index) {
+    const topic = topics[index];
+    if(!topic) return;
+    fetch(`/read?path=${encodeURIComponent(topic.path)}`)
+        .then(res => res.json())
+        .then(data => {
+            if(data.content) contentBox.value = data.content;
+            else contentBox.value = data.error || "Error loading file.";
+        });
+}
+
+function nextFile() {
+    if(topics.length === 0) return;
+    currentIndex = (currentIndex + 1) % topics.length;
+    topicSelect.selectedIndex = currentIndex;
+    showFile(currentIndex);
+}
+
+function prevFile() {
+    if(topics.length === 0) return;
+    currentIndex = (currentIndex - 1 + topics.length) % topics.length;
+    topicSelect.selectedIndex = currentIndex;
+    showFile(currentIndex);
+}
+</script>
+</body>
+</html>
